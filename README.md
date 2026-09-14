@@ -10,6 +10,17 @@ deepsearch -F 'invoice 2026' ~/Documents
 deepsearch -i -C 2 'needle' archive.zip
 ```
 
+## Install
+
+Download the binary for your platform from the GitHub release, verify its adjacent SHA-256 checksum, and put it somewhere on your `PATH`.
+
+- **Linux x86-64:** `deepsearch-linux-x86_64` is statically linked (musl), so it does not require a particular glibc version. Run `chmod +x deepsearch-linux-x86_64` after downloading.
+- **macOS Apple Silicon:** `deepsearch-macos-aarch64` (macOS 11+). Run `chmod +x deepsearch-macos-aarch64` after downloading.
+- **macOS Intel:** `deepsearch-macos-x86_64` (macOS 10.12+). Run `chmod +x deepsearch-macos-x86_64` after downloading.
+- **Windows x86-64:** `deepsearch-windows-x86_64.exe`.
+
+The first unsigned V1 binaries may trigger normal macOS Gatekeeper or Windows SmartScreen warnings because they are not code-signed. DeepSearch does not require administrator privileges or an installer.
+
 ## V1 formats
 
 - Normal text files, streamed without the old 64 MiB cutoff; UTF-8 plus BOM-marked UTF-16LE/UTF-16BE

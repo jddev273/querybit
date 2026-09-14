@@ -5,6 +5,7 @@ edition = "2021"
 description = "One executable searches inside almost everything"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
+repository = "https://github.com/jddev273/deepsearch"
 keywords = ["search", "grep", "archives", "pdf", "sqlite"]
 categories = ["command-line-utilities", "filesystem"]
 exclude = [

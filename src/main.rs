@@ -727,21 +727,44 @@ impl Searcher {
     }
 
     fn search_text(&mut self, label: &str, text: &str) {
-        let lines = text.lines().collect::<Vec<_>>();
-        let mut last_end = 0usize;
-        for (i, line) in lines.iter().enumerate() {
-            if self.rx.is_match(line) {
+        // Stream logical lines instead of collecting every line offset up front. A 64 MiB
+        // extracted member can contain tens of millions of tiny lines; collecting them into
+        // a Vec<&str> amplified memory far beyond the extraction safety budget.
+        let mut prev: VecDeque<(usize, &str)> = VecDeque::new();
+        let mut after = 0usize;
+        let mut last_printed = 0usize;
+
+        for (i, line) in text.lines().enumerate() {
+            let line_no = i + 1;
+            let hit = self.rx.is_match(line);
+            if hit {
                 self.matches += 1;
-                let a = i.saturating_sub(self.context);
-                let b = (i + self.context + 1).min(lines.len());
-                if a > last_end && self.context > 0 && last_end > 0 {
+                let first = prev.front().map(|(n, _)| *n).unwrap_or(line_no);
+                if self.context > 0 && last_printed > 0 && first > last_printed + 1 {
                     self.emit("--");
                 }
-                let start = a.max(last_end);
-                for (j, value) in lines.iter().enumerate().take(b).skip(start) {
-                    self.emit_line(label, j + 1, value);
+                for (n, value) in &prev {
+                    if *n > last_printed {
+                        self.emit_line(label, *n, value);
+                        last_printed = *n;
+                    }
                 }
-                last_end = last_end.max(b);
+                if line_no > last_printed {
+                    self.emit_line(label, line_no, line);
+                    last_printed = line_no;
+                }
+                after = self.context;
+            } else if after > 0 {
+                self.emit_line(label, line_no, line);
+                last_printed = line_no;
+                after -= 1;
+            }
+
+            if self.context > 0 {
+                prev.push_back((line_no, line));
+                while prev.len() > self.context {
+                    prev.pop_front();
+                }
             }
             if self.broken_pipe {
                 return;
