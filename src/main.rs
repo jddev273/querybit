@@ -827,15 +827,19 @@ fn decode_unicode_text(data: &[u8]) -> Option<String> {
     }
     if data.starts_with(&[0xff, 0xfe]) {
         let u = data[2..]
-            .chunks_exact(2)
-            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|c| u16::from_le_bytes(*c))
             .collect::<Vec<_>>();
         return Some(String::from_utf16_lossy(&u));
     }
     if data.starts_with(&[0xfe, 0xff]) {
         let u = data[2..]
-            .chunks_exact(2)
-            .map(|c| u16::from_be_bytes([c[0], c[1]]))
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|c| u16::from_be_bytes(*c))
             .collect::<Vec<_>>();
         return Some(String::from_utf16_lossy(&u));
     }
