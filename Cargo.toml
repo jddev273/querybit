@@ -1,0 +1,29 @@
+[package]
+name = "deepsearch"
+version = "0.1.0"
+edition = "2021"
+description = "One executable searches inside almost everything"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+keywords = ["search", "grep", "archives", "pdf", "sqlite"]
+categories = ["command-line-utilities", "filesystem"]
+exclude = [
+    "audit-fixtures/**",
+    "audit-fixtures-2/**",
+    "audit-fixtures-3/**",
+    "dist/**",
+]
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+ignore = "0.4"
+regex = "1"
+zip = { version = "2", default-features = false, features = ["deflate", "bzip2", "zstd"] }
+tar = "0.4"
+flate2 = "1"
+xz2 = "0.1"
+zstd = "0.13"
+quick-xml = "0.41"
+rusqlite = { version = "0.32", features = ["bundled", "limits"] }
+lopdf = "0.45"

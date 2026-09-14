@@ -1,0 +1,5 @@
+alpha
+context before
+NEEDLE_7429 plain
+context after
+omega
