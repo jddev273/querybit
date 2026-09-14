@@ -85,10 +85,19 @@ jobs:
           Copy-Item "target/${{ matrix.target }}/release/${{ matrix.binary }}" "${{ matrix.artifact }}"
           $hash = (Get-FileHash "${{ matrix.artifact }}" -Algorithm SHA256).Hash.ToLower()
           "$hash  ${{ matrix.artifact }}" | Set-Content "${{ matrix.artifact }}.sha256"
-      - name: Verify Linux artifact is statically linked
+      - name: Verify Linux artifact is static
         if: runner.os == 'Linux'
         shell: bash
-        run: file "${{ matrix.artifact }}" | grep -F 'statically linked'
+        run: |
+          file "${{ matrix.artifact }}"
+          if readelf -l "${{ matrix.artifact }}" | grep -q 'Requesting program interpreter'; then
+            echo 'Linux artifact unexpectedly has a dynamic interpreter' >&2
+            exit 1
+          fi
+          if readelf -d "${{ matrix.artifact }}" 2>/dev/null | grep -q '(NEEDED)'; then
+            echo 'Linux artifact unexpectedly has shared-library dependencies' >&2
+            exit 1
+          fi
       - name: Smoke staged Unix binary
         if: runner.os != 'Windows'
         shell: bash
