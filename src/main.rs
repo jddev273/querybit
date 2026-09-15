@@ -1073,3 +1073,43 @@ fn digits_after(s: &str, marker: &str) -> Option<usize> {
         .collect::<String>();
     digits.parse().ok()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn nested_sqlite_tempfile_does_not_clobber_legacy_collision() {
+        let source = tempfile::NamedTempFile::new().unwrap();
+        let db = Connection::open(source.path()).unwrap();
+        db.execute("CREATE TABLE notes(body TEXT)", []).unwrap();
+        db.execute("INSERT INTO notes(body) VALUES ('safe')", [])
+            .unwrap();
+        drop(db);
+        let bytes = fs::read(source.path()).unwrap();
+
+        let victim =
+            std::env::temp_dir().join(format!("deepsearch-{}-0-0.sqlite", std::process::id()));
+        let sentinel = b"DEEPSEARCH_TEMPFILE_SENTINEL";
+        let _ = fs::remove_file(&victim);
+        fs::write(&victim, sentinel).unwrap();
+
+        let mut searcher = Searcher {
+            rx: Regex::new("NO_MATCH_EXPECTED").unwrap(),
+            context: 0,
+            max_depth: 1,
+            expanded: 0,
+            matches: 0,
+            incomplete: false,
+            broken_pipe: false,
+            out: BufWriter::new(io::stdout()),
+        };
+
+        let result = searcher.search_sqlite_bytes("nested.sqlite", &bytes);
+        let victim_after = fs::read(&victim);
+        let _ = fs::remove_file(&victim);
+
+        result.unwrap();
+        assert_eq!(victim_after.unwrap(), sentinel);
+    }
+}
