@@ -483,3 +483,67 @@ fn extracted_context_does_not_duplicate_overlaps() {
     assert_eq!(stdout.matches("::ctx.txt:3:").count(), 1, "{stdout}");
     let _ = fs::remove_dir_all(root);
 }
+
+#[test]
+fn non_sqlite_db_file_does_not_make_directory_search_incomplete() {
+    let root = temp_dir();
+    let needle = "JUNK_DB_NEEDLE_314159";
+    fs::write(root.join("chrome.db"), b"junk").unwrap();
+    fs::write(root.join("hit.txt"), format!("{needle}\n")).unwrap();
+
+    let output = run(&["-F", needle, root.to_str().unwrap()]);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(String::from_utf8_lossy(&output.stdout).contains("hit.txt"));
+    assert!(
+        !String::from_utf8_lossy(&output.stderr).contains("file is not a database"),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn sqlite_is_detected_by_magic_without_database_extension() {
+    let root = temp_dir();
+    let needle = "SQLITE_MAGIC_NEEDLE_271828";
+    let path = root.join("database.bin");
+    let db = Connection::open(&path).unwrap();
+    db.execute("CREATE TABLE notes(body TEXT)", []).unwrap();
+    db.execute("INSERT INTO notes(body) VALUES (?1)", [needle])
+        .unwrap();
+    drop(db);
+
+    let output = run(&["-F", needle, path.to_str().unwrap()]);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stdout).contains("database.bin::table=notes"),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn committed_xlsx_fixture_is_searchable() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/sample.xlsx");
+    let output = run(&["-F", "NEEDLE_7429", path.to_str().unwrap()]);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("sheet=Sheet1"), "{stdout}");
+    assert!(stdout.contains("cell=A1"), "{stdout}");
+}

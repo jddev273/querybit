@@ -167,7 +167,7 @@ impl Searcher {
         let meta = fs::metadata(path)?;
         let label = path.display().to_string();
         let lower = label.to_ascii_lowercase();
-        let magic = read_prefix(path, 8)?;
+        let magic = read_prefix(path, 16)?;
 
         if is_sqliteish(&lower, &magic) {
             return self.search_sqlite_path(path, &label);
@@ -825,11 +825,8 @@ fn is_zipish(label: &str, b: &[u8]) -> bool {
         || b.starts_with(b"PK\x03\x04")
 }
 
-fn is_sqliteish(label: &str, b: &[u8]) -> bool {
-    label.ends_with(".sqlite")
-        || label.ends_with(".sqlite3")
-        || label.ends_with(".db")
-        || b.starts_with(b"SQLite format 3\0")
+fn is_sqliteish(_label: &str, b: &[u8]) -> bool {
+    b.starts_with(b"SQLite format 3\0")
 }
 
 fn looks_text(b: &[u8]) -> bool {
