@@ -1,9 +1,9 @@
 use anyhow::{anyhow, Context, Result};
 use clap::Parser;
-use flate2::read::GzDecoder;
+use flate2::read::MultiGzDecoder;
 use ignore::WalkBuilder;
-use quick_xml::escape::unescape;
-use quick_xml::events::{BytesStart, Event};
+use quick_xml::escape::{resolve_xml_entity, unescape};
+use quick_xml::events::{BytesRef, BytesStart, Event};
 use quick_xml::Reader;
 use regex::{Regex, RegexBuilder};
 use rusqlite::{limits::Limit, types::ValueRef, Connection};
@@ -284,7 +284,7 @@ impl Searcher {
             return self.search_tar(label, bytes, depth);
         }
         if lower.ends_with(".tar.gz") || lower.ends_with(".tgz") {
-            let mut d = GzDecoder::new(bytes);
+            let mut d = MultiGzDecoder::new(bytes);
             return self.search_decoded_tar(label, &mut d, depth);
         }
         if lower.ends_with(".tar.xz") || lower.ends_with(".txz") {
@@ -296,7 +296,7 @@ impl Searcher {
             return self.search_decoded_tar(label, &mut d, depth);
         }
         if lower.ends_with(".gz") {
-            let mut d = GzDecoder::new(bytes);
+            let mut d = MultiGzDecoder::new(bytes);
             if let Some(out) = self.read_expanded(&label, &mut d)? {
                 return self.search_blob(trim_suffix(&label, ".gz"), &out, depth + 1);
             }
@@ -596,8 +596,13 @@ impl Searcher {
         r: &mut R,
         depth: usize,
     ) -> Result<()> {
-        let mut ar = Archive::new(r);
-        self.search_tar_archive(&label, &mut ar, depth)
+        let search_result = {
+            let mut ar = Archive::new(&mut *r);
+            self.search_tar_archive(&label, &mut ar, depth)
+        };
+        io::copy(r, &mut io::sink())
+            .with_context(|| format!("{label}: compressed stream integrity check failed"))?;
+        search_result
     }
 
     fn search_tar_archive<R: Read>(
@@ -878,25 +883,42 @@ fn attr_value(e: &BytesStart<'_>, wanted: &[u8]) -> Result<Option<String>, ()> {
     Ok(found)
 }
 
+fn append_xml_ref(out: &mut String, reference: &BytesRef<'_>) -> Option<()> {
+    if let Some(ch) = reference.resolve_char_ref().ok()? {
+        out.push(ch);
+        return Some(());
+    }
+    let name = reference.decode().ok()?;
+    out.push_str(resolve_xml_entity(name.as_ref())?);
+    Some(())
+}
+
 fn office_text(data: &[u8]) -> Option<String> {
     let mut r = Reader::from_reader(data);
     r.config_mut().trim_text(false);
     let mut out = String::new();
+    let mut depth = 0usize;
     loop {
         match r.read_event() {
+            Ok(Event::Start(_)) => depth = depth.checked_add(1)?,
             Ok(Event::Text(t)) => out.push_str(&unescape(&t.decode().ok()?).ok()?),
+            Ok(Event::GeneralRef(reference)) => append_xml_ref(&mut out, &reference)?,
             Ok(Event::CData(t)) => out.push_str(&String::from_utf8_lossy(&t)),
             Ok(Event::Empty(e)) => match local_name(e.name().as_ref()) {
                 b"br" => out.push('\n'),
                 b"tab" => out.push('\t'),
                 _ => {}
             },
-            Ok(Event::End(e)) => match local_name(e.name().as_ref()) {
-                b"p" | b"tr" => out.push('\n'),
-                b"tc" => out.push('\t'),
-                _ => {}
-            },
-            Ok(Event::Eof) => break,
+            Ok(Event::End(e)) => {
+                depth = depth.checked_sub(1)?;
+                match local_name(e.name().as_ref()) {
+                    b"p" | b"tr" => out.push('\n'),
+                    b"tc" => out.push('\t'),
+                    _ => {}
+                }
+            }
+            Ok(Event::Eof) if depth == 0 => break,
+            Ok(Event::Eof) => return None,
             Err(_) => return None,
             _ => {}
         }
@@ -908,20 +930,25 @@ fn generic_xml_text(data: &[u8]) -> Option<String> {
     let mut r = Reader::from_reader(data);
     r.config_mut().trim_text(false);
     let mut out = String::new();
+    let mut depth = 0usize;
     loop {
         match r.read_event() {
+            Ok(Event::Start(_)) => depth = depth.checked_add(1)?,
             Ok(Event::Text(t)) => out.push_str(&unescape(&t.decode().ok()?).ok()?),
+            Ok(Event::GeneralRef(reference)) => append_xml_ref(&mut out, &reference)?,
             Ok(Event::CData(t)) => out.push_str(&String::from_utf8_lossy(&t)),
             Ok(Event::Empty(e)) if local_name(e.name().as_ref()) == b"br" => out.push('\n'),
-            Ok(Event::End(e))
+            Ok(Event::End(e)) => {
+                depth = depth.checked_sub(1)?;
                 if matches!(
                     local_name(e.name().as_ref()),
                     b"p" | b"div" | b"li" | b"tr" | b"h1" | b"h2" | b"h3" | b"h4" | b"h5" | b"h6"
-                ) =>
-            {
-                out.push('\n')
+                ) {
+                    out.push('\n');
+                }
             }
-            Ok(Event::Eof) => break,
+            Ok(Event::Eof) if depth == 0 => break,
+            Ok(Event::Eof) => return None,
             Err(_) => return None,
             _ => {}
         }
@@ -934,20 +961,36 @@ fn xlsx_shared_strings(data: &[u8]) -> Option<Vec<String>> {
     r.config_mut().trim_text(false);
     let mut strings = Vec::new();
     let mut current: Option<String> = None;
+    let mut depth = 0usize;
     loop {
         match r.read_event() {
-            Ok(Event::Start(e)) if local_name(e.name().as_ref()) == b"si" => {
-                current = Some(String::new())
+            Ok(Event::Start(e)) => {
+                depth = depth.checked_add(1)?;
+                if local_name(e.name().as_ref()) == b"si" {
+                    if current.is_some() {
+                        return None;
+                    }
+                    current = Some(String::new());
+                }
             }
             Ok(Event::Text(t)) => {
                 if let Some(s) = current.as_mut() {
                     s.push_str(&unescape(&t.decode().ok()?).ok()?);
                 }
             }
-            Ok(Event::End(e)) if local_name(e.name().as_ref()) == b"si" => {
-                strings.push(current.take().unwrap_or_default());
+            Ok(Event::GeneralRef(reference)) => {
+                if let Some(s) = current.as_mut() {
+                    append_xml_ref(s, &reference)?;
+                }
             }
-            Ok(Event::Eof) => break,
+            Ok(Event::End(e)) => {
+                if local_name(e.name().as_ref()) == b"si" {
+                    strings.push(current.take()?);
+                }
+                depth = depth.checked_sub(1)?;
+            }
+            Ok(Event::Eof) if depth == 0 && current.is_none() => break,
+            Ok(Event::Eof) => return None,
             Err(_) => return None,
             _ => {}
         }
@@ -1006,24 +1049,28 @@ fn xlsx_cells(data: &[u8], shared: &[String]) -> Option<Vec<(String, String, boo
     let mut in_value = false;
     let mut in_formula = false;
     let mut in_cell = false;
+    let mut depth = 0usize;
     loop {
         match r.read_event() {
-            Ok(Event::Start(e)) if local_name(e.name().as_ref()) == b"c" => {
-                in_cell = true;
-                cell_ref = attr_value(&e, b"r")
-                    .ok()?
-                    .unwrap_or_else(|| "?".to_string());
-                cell_type = attr_value(&e, b"t").ok()?.unwrap_or_default();
-                value.clear();
-                formula.clear();
-            }
-            Ok(Event::Start(e))
-                if in_cell && matches!(local_name(e.name().as_ref()), b"v" | b"t") =>
-            {
-                in_value = true;
-            }
-            Ok(Event::Start(e)) if in_cell && local_name(e.name().as_ref()) == b"f" => {
-                in_formula = true;
+            Ok(Event::Start(e)) => {
+                depth = depth.checked_add(1)?;
+                match local_name(e.name().as_ref()) {
+                    b"c" => {
+                        if in_cell {
+                            return None;
+                        }
+                        in_cell = true;
+                        cell_ref = attr_value(&e, b"r")
+                            .ok()?
+                            .unwrap_or_else(|| "?".to_string());
+                        cell_type = attr_value(&e, b"t").ok()?.unwrap_or_default();
+                        value.clear();
+                        formula.clear();
+                    }
+                    b"v" | b"t" if in_cell => in_value = true,
+                    b"f" if in_cell => in_formula = true,
+                    _ => {}
+                }
             }
             Ok(Event::Text(t)) if in_cell && in_formula => {
                 formula.push_str(&unescape(&t.decode().ok()?).ok()?);
@@ -1031,33 +1078,42 @@ fn xlsx_cells(data: &[u8], shared: &[String]) -> Option<Vec<(String, String, boo
             Ok(Event::Text(t)) if in_cell && in_value => {
                 value.push_str(&unescape(&t.decode().ok()?).ok()?);
             }
-            Ok(Event::End(e)) if matches!(local_name(e.name().as_ref()), b"v" | b"t") => {
-                in_value = false;
+            Ok(Event::GeneralRef(reference)) if in_cell && in_formula => {
+                append_xml_ref(&mut formula, &reference)?;
             }
-            Ok(Event::End(e)) if local_name(e.name().as_ref()) == b"f" => {
-                in_formula = false;
+            Ok(Event::GeneralRef(reference)) if in_cell && in_value => {
+                append_xml_ref(&mut value, &reference)?;
             }
-            Ok(Event::End(e)) if local_name(e.name().as_ref()) == b"c" => {
-                if !formula.is_empty() {
-                    out.push((cell_ref.clone(), formula.clone(), true));
+            Ok(Event::End(e)) => {
+                match local_name(e.name().as_ref()) {
+                    b"v" | b"t" => in_value = false,
+                    b"f" => in_formula = false,
+                    b"c" => {
+                        if !in_cell {
+                            return None;
+                        }
+                        if !formula.is_empty() {
+                            out.push((cell_ref.clone(), formula.clone(), true));
+                        }
+                        let rendered = if cell_type == "s" {
+                            let index = value.parse::<usize>().ok()?;
+                            shared.get(index)?.clone()
+                        } else {
+                            value.clone()
+                        };
+                        if !rendered.is_empty() {
+                            out.push((cell_ref.clone(), rendered, false));
+                        }
+                        in_cell = false;
+                        in_value = false;
+                        in_formula = false;
+                    }
+                    _ => {}
                 }
-                let rendered = if cell_type == "s" {
-                    value
-                        .parse::<usize>()
-                        .ok()
-                        .and_then(|i| shared.get(i).cloned())
-                        .unwrap_or_else(|| value.clone())
-                } else {
-                    value.clone()
-                };
-                if !rendered.is_empty() {
-                    out.push((cell_ref.clone(), rendered, false));
-                }
-                in_cell = false;
-                in_value = false;
-                in_formula = false;
+                depth = depth.checked_sub(1)?;
             }
-            Ok(Event::Eof) => break,
+            Ok(Event::Eof) if depth == 0 && !in_cell && !in_value && !in_formula => break,
+            Ok(Event::Eof) => return None,
             Err(_) => return None,
             _ => {}
         }

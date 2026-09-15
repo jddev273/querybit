@@ -1,3 +1,4 @@
+use flate2::{write::GzEncoder, Compression};
 use rusqlite::Connection;
 use std::{
     fs,
@@ -580,6 +581,168 @@ fn nested_sqlite_in_zip_is_searchable() {
         String::from_utf8_lossy(&output.stdout).contains("bundle.zip::inside.sqlite::table=notes"),
         "{}",
         String::from_utf8_lossy(&output.stdout)
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn xml_entities_are_preserved_in_docx_epub_and_xlsx() {
+    let root = temp_dir();
+    let needle = "AT&T NEEDLE";
+
+    let docx = root.join("entities.docx");
+    zip_write(
+        &docx,
+        &[(
+            "word/document.xml",
+            "<w:document xmlns:w=\"x\"><w:p><w:r><w:t>AT&amp;T &#78;EEDLE</w:t></w:r></w:p></w:document>".to_string(),
+        )],
+    );
+    let epub = root.join("entities.epub");
+    zip_write(
+        &epub,
+        &[(
+            "OEBPS/ch1.xhtml",
+            "<html><body><p>AT&amp;T &#78;EEDLE</p></body></html>".to_string(),
+        )],
+    );
+    let xlsx = root.join("entities.xlsx");
+    zip_write(
+        &xlsx,
+        &[
+            (
+                "xl/sharedStrings.xml",
+                "<sst><si><t>AT&amp;T &#78;EEDLE</t></si></sst>".to_string(),
+            ),
+            (
+                "xl/workbook.xml",
+                "<workbook xmlns:r=\"r\"><sheets><sheet name=\"Sheet1\" r:id=\"rId1\"/></sheets></workbook>".to_string(),
+            ),
+            (
+                "xl/_rels/workbook.xml.rels",
+                "<Relationships><Relationship Id=\"rId1\" Target=\"worksheets/sheet1.xml\"/></Relationships>".to_string(),
+            ),
+            (
+                "xl/worksheets/sheet1.xml",
+                "<worksheet><sheetData><row><c r=\"A1\" t=\"s\"><v>0</v></c></row></sheetData></worksheet>".to_string(),
+            ),
+        ],
+    );
+
+    for path in [&docx, &epub, &xlsx] {
+        let output = run(&["-F", needle, path.to_str().unwrap()]);
+        assert_eq!(
+            output.status.code(),
+            Some(0),
+            "{}: {}",
+            path.display(),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn concatenated_gzip_searches_later_members() {
+    let root = temp_dir();
+    let path = root.join("concat.txt.gz");
+    let needle = "SECOND_GZIP_MEMBER_NEEDLE_4242";
+    let encode = |body: &[u8]| {
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(body).unwrap();
+        encoder.finish().unwrap()
+    };
+    let mut bytes = encode(b"first member without it\n");
+    bytes.extend_from_slice(&encode(format!("{needle}\n").as_bytes()));
+    fs::write(&path, bytes).unwrap();
+
+    let output = run(&["-F", needle, path.to_str().unwrap()]);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(String::from_utf8_lossy(&output.stdout).contains(needle));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn truncated_docx_xml_is_incomplete() {
+    let root = temp_dir();
+    let path = root.join("truncated.docx");
+    zip_write(
+        &path,
+        &[(
+            "word/document.xml",
+            "<w:document xmlns:w=\"x\"><w:p><w:r><w:t>TRUNCATED_XML_NEEDLE".to_string(),
+        )],
+    );
+    let output = run(&["-F", "TRUNCATED_XML_NEEDLE", path.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("malformed XML"));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn unresolved_xlsx_shared_string_is_incomplete() {
+    let root = temp_dir();
+    let path = root.join("missing-shared.xlsx");
+    zip_write(
+        &path,
+        &[
+            (
+                "xl/workbook.xml",
+                "<workbook xmlns:r=\"r\"><sheets><sheet name=\"Sheet1\" r:id=\"rId1\"/></sheets></workbook>".to_string(),
+            ),
+            (
+                "xl/_rels/workbook.xml.rels",
+                "<Relationships><Relationship Id=\"rId1\" Target=\"worksheets/sheet1.xml\"/></Relationships>".to_string(),
+            ),
+            (
+                "xl/worksheets/sheet1.xml",
+                "<worksheet><sheetData><row><c r=\"A1\" t=\"s\"><v>0</v></c></row></sheetData></worksheet>".to_string(),
+            ),
+        ],
+    );
+    let output = run(&["-F", "ABSENT_SHARED_STRING", path.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("malformed worksheet XML"));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn corrupted_tar_gzip_trailer_is_incomplete() {
+    let root = temp_dir();
+    let path = root.join("corrupt.tar.gz");
+    let needle = "TAR_GZIP_CHECKSUM_NEEDLE_31337";
+
+    let mut tar_bytes = Vec::new();
+    {
+        let mut builder = tar::Builder::new(&mut tar_bytes);
+        let body = format!("{needle}\n");
+        let mut header = tar::Header::new_gnu();
+        header.set_size(body.len() as u64);
+        header.set_mode(0o644);
+        header.set_cksum();
+        builder
+            .append_data(&mut header, "inside.txt", body.as_bytes())
+            .unwrap();
+        builder.finish().unwrap();
+    }
+    let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+    encoder.write_all(&tar_bytes).unwrap();
+    let mut gzip = encoder.finish().unwrap();
+    let crc_index = gzip.len() - 8;
+    gzip[crc_index] ^= 0x01;
+    fs::write(&path, gzip).unwrap();
+
+    let output = run(&["-F", needle, path.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("checksum") || stderr.contains("integrity"),
+        "{stderr}"
     );
     let _ = fs::remove_dir_all(root);
 }
