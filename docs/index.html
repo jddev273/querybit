@@ -1,1 +1,140 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f4f1e8"><meta name="description" content="QueryBit searches inside PDFs, Office documents, archives, SQLite databases and more — one binary, no index required."><meta property="og:title" content="QueryBit — Search inside almost anything"><meta property="og:description" content="One binary. No index. Search PDFs, Office docs, archives, SQLite and nested containers directly."><meta property="og:type" content="website"><meta property="og:url" content="https://jddev273.github.io/querybit/"><meta property="og:image" content="https://jddev273.github.io/querybit/social.png"><meta name="twitter:card" content="summary_large_image"><title>QueryBit — Search inside almost anything</title><link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"></head><body><header><div class="wrap"><nav aria-label="Primary navigation"><a class="brand" href="#top"><svg class="mark" viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" fill="#2457e6"/><circle cx="19" cy="19" r="9" fill="none" stroke="#fff" stroke-width="4"/><path d="M24 24 32 32" stroke="#fff" stroke-width="4"/></svg><span>QueryBit</span></a><div class="links"><a href="#formats">Formats</a><a href="#why">Why QueryBit</a><a href="https://github.com/jddev273/querybit">GitHub</a><a class="download" href="https://github.com/jddev273/querybit/releases/latest">Download ↗</a></div></nav></div></header><main id="top"><div class="hero"><div class="wrap hero-grid"><div><div class="eyebrow">Native deep search</div><h1>Search inside almost anything.</h1><p>Documents, archives, databases and nested files — with one executable and no index to build first.</p><div class="actions"><a class="button primary" href="https://github.com/jddev273/querybit/releases/latest">Download QueryBit</a><a class="button secondary" href="https://github.com/jddev273/querybit">View source</a></div></div><div class="search-card" aria-label="Example nested archive search result"><div class="card-label">One search · no unpacking</div><div class="path-stack"><div class="path">old-backups.zip</div><div class="path">records-2019.zip</div><div class="path">quarterly-report.pdf</div><div class="path">page 12 · revenue target</div></div><div class="result"><strong>querybit 'revenue target' ~/Archive</strong><br>old-backups.zip::records-2019.zip::quarterly-report.pdf::page=12:37:revenue target</div></div></div></div><section><div class="wrap"><div class="section-head"><div class="section-no">01 / The point</div><div><h2>A search tool for the stuff you don't search every day.</h2><p class="intro">QueryBit is for the moment when you know something is somewhere in an old folder, archive or document pile. You want to search it now, not build an index or install a stack of converters.</p></div></div><div class="three"><article class="feature"><div class="num">01</div><h3>No index</h3><p>Point QueryBit at a file, directory or archive and search what is there right now. Nothing has to run in the background.</p></article><article class="feature"><div class="num">02</div><h3>One executable</h3><p>Format support is built in. Copy QueryBit onto a machine and use it without assembling a separate document-search toolchain.</p></article><article class="feature"><div class="num">03</div><h3>No silent “no match”</h3><p>If a corrupt file, parser failure or safety limit makes a search incomplete, QueryBit reports that instead of quietly pretending nothing matched.</p></article></div></div></section><section id="formats"><div class="wrap"><div class="section-head"><div class="section-no">02 / Formats</div><div><h2>Mixed folders are the normal case.</h2><p class="intro">Search ordinary text and structured files in the same pass, including archives inside archives. Results preserve where the match came from.</p></div></div><div class="formats"><span class="format em">PDF</span><span class="format em">DOCX</span><span class="format em">XLSX</span><span class="format em">PPTX</span><span class="format">SQLite</span><span class="format">EPUB</span><span class="format">ZIP</span><span class="format">TAR</span><span class="format">tar.gz / tgz</span><span class="format">tar.xz / txz</span><span class="format">tar.zst / tzst</span><span class="format">gzip</span><span class="format">xz</span><span class="format">zstd</span><span class="format">UTF-8 text</span><span class="format">UTF-16 text</span><span class="format">nested archives</span></div></div></section><section id="why"><div class="wrap why"><div><div class="section-no" style="margin-bottom:28px">03 / Origin</div><div class="why-callout">QueryBit grew out of a problem I kept running into.</div></div><div class="why-copy"><p>I’d be trying to find something from years ago, know it was somewhere in an old archive, and have no idea which ZIP it was in. Usually that meant unpacking a bunch of archives just to search the PDFs and documents inside them.</p><p>On Windows I normally use Everything; on Linux, I reach for <code>grep</code> or <code>rg</code>. <code>rga</code> (ripgrep-all) goes further into file formats. Depending on what you want to search, that can mean installing and maintaining extra supporting tools. I use multiple machines and operating systems, and I didn’t want to set all of that up everywhere for something I only need occasionally.</p><p><strong>What I wanted was simpler: one executable I could copy onto almost any machine. I could point it at a directory or archive, search immediately, and then forget about it until I needed it again.</strong></p><p>No index to build. No background service. No need to unpack everything first.</p></div></div></section><section id="install"><div class="wrap"><div class="install"><div><div class="section-no" style="color:#fff;opacity:.75;margin-bottom:28px">04 / Get it</div><h2>Keep it around. Run it when you need it.</h2><p>QueryBit ships as native binaries for Windows x86-64, Linux x86-64, macOS Apple Silicon and macOS Intel.</p></div><div class="install-side"><div class="cmd">querybit -i -C 2 'needle' ~/Archive</div><div class="cmd">querybit -F 'invoice 2026' old-backups.zip</div><a class="button" href="https://github.com/jddev273/querybit/releases/latest">Download the latest release ↗</a><p class="fine">No installer required. V1 binaries are unsigned, so macOS Gatekeeper or Windows SmartScreen may show the usual first-run warning.</p></div></div></div></section></main><footer><div class="wrap footer"><div>QueryBit · MIT or Apache-2.0</div><div><a href="https://github.com/jddev273/querybit">Source</a> · <a href="https://github.com/jddev273/querybit/releases">Releases</a> · <a href="https://github.com/jddev273/querybit/blob/main/SECURITY.md">Security</a></div></div></footer></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#f5f2ea">
+<meta name="description" content="QueryBit searches inside PDFs, Office documents, archives, SQLite databases and more — one binary, no index required.">
+<meta property="og:title" content="QueryBit — Search inside almost anything">
+<meta property="og:description" content="One binary. No index. Search PDFs, Office docs, archives, SQLite and nested containers directly.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://jddev273.github.io/querybit/">
+<meta property="og:image" content="https://jddev273.github.io/querybit/social.png">
+<meta name="twitter:card" content="summary_large_image">
+<title>QueryBit — Search inside almost anything</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <nav aria-label="Primary navigation">
+      <a class="brand" href="#top" aria-label="QueryBit home">
+        <svg class="mark" viewBox="0 0 40 40" aria-hidden="true">
+          <rect x="2" y="2" width="36" height="36" rx="7" fill="currentColor"/>
+          <rect x="10" y="10" width="20" height="20" rx="4" fill="none" stroke="white" stroke-width="2.4"/>
+          <rect x="15" y="15" width="10" height="10" rx="2" fill="none" stroke="white" stroke-width="2.4"/>
+          <path d="M24 24 31 31" stroke="white" stroke-width="2.8" stroke-linecap="round"/>
+        </svg>
+        <span>QueryBit</span>
+      </a>
+      <div class="links">
+        <a href="#formats">Formats</a>
+        <a href="#why">Why QueryBit</a>
+        <a href="https://github.com/jddev273/querybit">GitHub</a>
+        <a class="download" href="https://github.com/jddev273/querybit/releases/latest">Download <span>↗</span></a>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <div class="eyebrow"><span></span> Native deep search</div>
+        <h1>Search inside <em>almost anything.</em></h1>
+        <p>Documents, archives, databases and nested files — with one executable and no index to build first.</p>
+        <div class="actions">
+          <a class="button primary" href="https://github.com/jddev273/querybit/releases/latest">Download QueryBit <span>↓</span></a>
+          <a class="button secondary" href="https://github.com/jddev273/querybit">View source <span>↗</span></a>
+        </div>
+        <div class="hero-proof"><span>PDF</span><span>DOCX</span><span>ZIP</span><span>SQLite</span><span>+ nested archives</span></div>
+      </div>
+
+      <div class="instrument" aria-label="Example QueryBit search through nested files">
+        <div class="instrument-top">
+          <div class="dots"><i></i><i></i><i></i></div>
+          <div class="instrument-title">querybit / search</div>
+          <div class="status"><b></b> complete</div>
+        </div>
+        <div class="command"><span class="prompt">$</span><span>querybit</span> <strong>"revenue target"</strong> ~/Archive</div>
+        <div class="trace-label">MATCH PATH</div>
+        <div class="trace">
+          <div class="trace-line one"><span class="node">01</span><span class="file">old-backups.zip</span><span class="type">ZIP</span></div>
+          <div class="trace-line two"><span class="node">02</span><span class="file">records-2019.zip</span><span class="type">ZIP</span></div>
+          <div class="trace-line three"><span class="node">03</span><span class="file">quarterly-report.pdf</span><span class="type">PDF</span></div>
+          <div class="trace-line hit"><span class="node">04</span><span class="file">page 12</span><span class="match">revenue target</span></div>
+        </div>
+        <div class="result-strip"><span>1 match</span><code>old-backups.zip::records-2019.zip::quarterly-report.pdf::page=12:37</code></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="point">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="section-no">01 <span>/</span> The point</div>
+        <div>
+          <h2>A search tool for the stuff you don't search every day.</h2>
+          <p class="intro">QueryBit is for the moment when you know something is somewhere in an old folder, archive or document pile. You want to search it now, not build an index or install a stack of converters.</p>
+        </div>
+      </div>
+      <div class="three">
+        <article class="feature"><div class="num">01</div><div><h3>No index</h3><p>Point QueryBit at a file, directory or archive and search what is there right now. Nothing has to run in the background.</p></div></article>
+        <article class="feature"><div class="num">02</div><div><h3>One executable</h3><p>Format support is built in. Copy QueryBit onto a machine and use it without assembling a separate document-search toolchain.</p></div></article>
+        <article class="feature"><div class="num">03</div><div><h3>No silent “no match”</h3><p>If a corrupt file, parser failure or safety limit makes a search incomplete, QueryBit reports that instead of quietly pretending nothing matched.</p></div></article>
+      </div>
+    </div>
+  </section>
+
+  <section id="formats" class="formats-section">
+    <div class="wrap">
+      <div class="section-head compact">
+        <div class="section-no">02 <span>/</span> Formats</div>
+        <div><h2>Mixed folders are the normal case.</h2><p class="intro">Search ordinary text and structured files in the same pass, including archives inside archives. Results preserve where the match came from.</p></div>
+      </div>
+      <div class="format-board">
+        <div class="format-major"><span>PDF</span><span>DOCX</span><span>XLSX</span><span>PPTX</span><span>SQLite</span><span>EPUB</span></div>
+        <div class="format-minor"><span>ZIP</span><span>TAR</span><span>tar.gz / tgz</span><span>tar.xz / txz</span><span>tar.zst / tzst</span><span>gzip</span><span>xz</span><span>zstd</span><span>UTF-8 text</span><span>UTF-16 text</span><span>nested archives</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="why" class="origin-section">
+    <div class="wrap why">
+      <div class="origin-lead">
+        <div class="section-no">03 <span>/</span> Origin</div>
+        <div class="why-callout">Built for the file you know exists — <em>somewhere.</em></div>
+      </div>
+      <div class="why-copy">
+        <p>I’d be trying to find something from years ago, know it was somewhere in an old archive, and have no idea which ZIP it was in. Usually that meant unpacking a bunch of archives just to search the PDFs and documents inside them.</p>
+        <p>On Windows I normally use Everything; on Linux, I reach for <code>grep</code>. Other search tools cover parts of this workflow, but I use multiple machines and operating systems and didn’t want to maintain a collection of supporting tools for something I only need occasionally.</p>
+        <p class="pull"><strong>What I wanted was simpler: one executable I could copy onto almost any machine, point at a directory or archive, search immediately, and then forget about until I needed it again.</strong></p>
+        <p>No index to build. No background service. No need to unpack everything first.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="install" class="get-section">
+    <div class="wrap">
+      <div class="install">
+        <div class="install-copy">
+          <div class="section-no">04 <span>/</span> Get it</div>
+          <h2>Keep it around.<br>Run it when you need it.</h2>
+          <p>Native binaries for Windows x86-64, Linux x86-64, macOS Apple Silicon and macOS Intel.</p>
+        </div>
+        <div class="install-side">
+          <div class="cmd"><span>$</span><code>querybit -i -C 2 'needle' ~/Archive</code></div>
+          <div class="cmd"><span>$</span><code>querybit -F 'invoice 2026' old-backups.zip</code></div>
+          <a class="button light" href="https://github.com/jddev273/querybit/releases/latest">Download the latest release <span>↗</span></a>
+          <p class="fine">No installer required. V1 binaries are unsigned, so macOS Gatekeeper or Windows SmartScreen may show the usual first-run warning.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer><div class="wrap footer"><div class="footer-brand"><svg class="mini-mark" viewBox="0 0 20 20" aria-hidden="true"><rect x="1" y="1" width="18" height="18" rx="4" fill="currentColor"/><rect x="6" y="6" width="8" height="8" rx="2" fill="none" stroke="white" stroke-width="1.5"/><path d="M12 12 16 16" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>QueryBit <span>· MIT or Apache-2.0</span></div><div><a href="https://github.com/jddev273/querybit">Source</a><a href="https://github.com/jddev273/querybit/releases">Releases</a><a href="https://github.com/jddev273/querybit/blob/main/SECURITY.md">Security</a></div></div></footer>
+</body>
+</html>
