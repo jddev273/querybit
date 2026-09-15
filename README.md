@@ -1,25 +1,25 @@
-# DeepSearch
+# QueryBit
 
 **One executable searches inside almost everything.**
 
-DeepSearch is a native Rust CLI for people who want grep-style search across ordinary files, documents, archives, and SQLite without installing Poppler, Pandoc, FFmpeg, or a collection of format-specific command-line tools.
+QueryBit is a native Rust CLI for people who want grep-style search across ordinary files, documents, archives, and SQLite without installing Poppler, Pandoc, FFmpeg, or a collection of format-specific command-line tools.
 
 ```bash
-deepsearch 'error.*timeout' .
-deepsearch -F 'invoice 2026' ~/Documents
-deepsearch -i -C 2 'needle' archive.zip
+querybit 'error.*timeout' .
+querybit -F 'invoice 2026' ~/Documents
+querybit -i -C 2 'needle' archive.zip
 ```
 
 ## Install
 
 Download the binary for your platform from the GitHub release, verify its adjacent SHA-256 checksum, and put it somewhere on your `PATH`.
 
-- **Linux x86-64:** `deepsearch-linux-x86_64` is statically linked (musl), so it does not require a particular glibc version. Run `chmod +x deepsearch-linux-x86_64` after downloading.
-- **macOS Apple Silicon:** `deepsearch-macos-aarch64` (macOS 11+). Run `chmod +x deepsearch-macos-aarch64` after downloading.
-- **macOS Intel:** `deepsearch-macos-x86_64` (macOS 10.12+). Run `chmod +x deepsearch-macos-x86_64` after downloading.
-- **Windows x86-64:** `deepsearch-windows-x86_64.exe`.
+- **Linux x86-64:** `querybit-linux-x86_64` is statically linked (musl), so it does not require a particular glibc version. Run `chmod +x querybit-linux-x86_64` after downloading.
+- **macOS Apple Silicon:** `querybit-macos-aarch64` (macOS 11+). Run `chmod +x querybit-macos-aarch64` after downloading.
+- **macOS Intel:** `querybit-macos-x86_64` (macOS 10.12+). Run `chmod +x querybit-macos-x86_64` after downloading.
+- **Windows x86-64:** `querybit-windows-x86_64.exe`.
 
-The first unsigned V1 binaries may trigger normal macOS Gatekeeper or Windows SmartScreen warnings because they are not code-signed. DeepSearch does not require administrator privileges or an installer.
+The first unsigned V1 binaries may trigger normal macOS Gatekeeper or Windows SmartScreen warnings because they are not code-signed. QueryBit does not require administrator privileges or an installer.
 
 ## V1 formats
 
@@ -59,7 +59,7 @@ cargo clippy --all-targets --locked -- -D warnings
 
 Release CI gates publication on formatting, strict Clippy, tests, and a current RustSec audit, then runs native tests on Linux, Intel macOS, Apple Silicon macOS, and Windows before staging binaries and SHA-256 checksums.
 
-The release binary embeds the format parsers/codecs and bundled SQLite used by DeepSearch. It does **not** shell out to Poppler, Pandoc, SQLite, gzip, xz, zstd, or office tools.
+The release binary embeds the format parsers/codecs and bundled SQLite used by QueryBit. It does **not** shell out to Poppler, Pandoc, SQLite, gzip, xz, zstd, or office tools.
 
 ## Scope decisions
 

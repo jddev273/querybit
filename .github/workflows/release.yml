@@ -43,20 +43,20 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
-            artifact: deepsearch-linux-x86_64
-            binary: deepsearch
+            artifact: querybit-linux-x86_64
+            binary: querybit
           - os: macos-15-intel
             target: x86_64-apple-darwin
-            artifact: deepsearch-macos-x86_64
-            binary: deepsearch
+            artifact: querybit-macos-x86_64
+            binary: querybit
           - os: macos-14
             target: aarch64-apple-darwin
-            artifact: deepsearch-macos-aarch64
-            binary: deepsearch
+            artifact: querybit-macos-aarch64
+            binary: querybit
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact: deepsearch-windows-x86_64.exe
-            binary: deepsearch.exe
+            artifact: querybit-windows-x86_64.exe
+            binary: querybit.exe
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -102,14 +102,14 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          printf 'CI_STAGED_BINARY_NEEDLE\n' > deepsearch-smoke.txt
-          "./${{ matrix.artifact }}" -F CI_STAGED_BINARY_NEEDLE deepsearch-smoke.txt | grep -F CI_STAGED_BINARY_NEEDLE
+          printf 'CI_STAGED_BINARY_NEEDLE\n' > querybit-smoke.txt
+          "./${{ matrix.artifact }}" -F CI_STAGED_BINARY_NEEDLE querybit-smoke.txt | grep -F CI_STAGED_BINARY_NEEDLE
       - name: Smoke staged Windows binary
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          'CI_STAGED_BINARY_NEEDLE' | Set-Content deepsearch-smoke.txt
-          $output = & ".\${{ matrix.artifact }}" -F CI_STAGED_BINARY_NEEDLE deepsearch-smoke.txt
+          'CI_STAGED_BINARY_NEEDLE' | Set-Content querybit-smoke.txt
+          $output = & ".\${{ matrix.artifact }}" -F CI_STAGED_BINARY_NEEDLE querybit-smoke.txt
           if ($LASTEXITCODE -ne 0 -or $output -notmatch 'CI_STAGED_BINARY_NEEDLE') { exit 1 }
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

@@ -17,13 +17,14 @@ use tar::Archive;
 use xz2::read::XzDecoder;
 
 const MAX_ENTRY_BYTES: usize = 64 * 1024 * 1024;
+const MAX_TAR_INTEGRITY_DRAIN_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_TOTAL_EXPANDED: usize = 512 * 1024 * 1024;
 const MAX_TOPLEVEL_CONTAINER_BYTES: u64 = 512 * 1024 * 1024;
 const MAX_PLAIN_LINE_BYTES: usize = 16 * 1024 * 1024;
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "deepsearch",
+    name = "querybit",
     version,
     about = "Download one file; grep almost anything"
 )]
@@ -58,7 +59,7 @@ fn main() {
     let code = match run() {
         Ok(code) => code,
         Err(e) => {
-            eprintln!("deepsearch: {e:#}");
+            eprintln!("querybit: {e:#}");
             2
         }
     };
@@ -141,7 +142,7 @@ fn run() -> Result<i32> {
 impl Searcher {
     fn warn(&mut self, message: String) {
         self.incomplete = true;
-        eprintln!("deepsearch: warning: {message}");
+        eprintln!("querybit: warning: {message}");
     }
 
     fn emit(&mut self, line: &str) {
@@ -600,8 +601,15 @@ impl Searcher {
             let mut ar = Archive::new(&mut *r);
             self.search_tar_archive(&label, &mut ar, depth)
         };
-        io::copy(r, &mut io::sink())
+        let mut integrity_tail = (&mut *r).take(MAX_TAR_INTEGRITY_DRAIN_BYTES + 1);
+        let drained = io::copy(&mut integrity_tail, &mut io::sink())
             .with_context(|| format!("{label}: compressed stream integrity check failed"))?;
+        if drained > MAX_TAR_INTEGRITY_DRAIN_BYTES {
+            self.warn(format!(
+                "{label}: compressed TAR integrity tail exceeded the {} MiB safety budget",
+                MAX_TAR_INTEGRITY_DRAIN_BYTES / (1024 * 1024)
+            ));
+        }
         search_result
     }
 
@@ -654,7 +662,7 @@ impl Searcher {
 
     fn search_sqlite_bytes(&mut self, label: &str, bytes: &[u8]) -> Result<()> {
         let mut tmp = tempfile::Builder::new()
-            .prefix("deepsearch-")
+            .prefix("querybit-")
             .suffix(".sqlite")
             .tempfile()?;
         tmp.write_all(bytes)?;
@@ -1001,16 +1009,25 @@ fn xlsx_shared_strings(data: &[u8]) -> Option<Vec<String>> {
 fn workbook_relationships(data: &[u8]) -> Option<HashMap<String, String>> {
     let mut r = Reader::from_reader(data);
     let mut map = HashMap::new();
+    let mut depth = 0usize;
     loop {
         match r.read_event() {
-            Ok(Event::Start(e)) | Ok(Event::Empty(e))
-                if local_name(e.name().as_ref()) == b"Relationship" =>
-            {
+            Ok(Event::Start(e)) => {
+                depth = depth.checked_add(1)?;
+                if local_name(e.name().as_ref()) == b"Relationship" {
+                    let id = attr_value(&e, b"Id").ok()??;
+                    let target = attr_value(&e, b"Target").ok()??;
+                    map.insert(id, target);
+                }
+            }
+            Ok(Event::Empty(e)) if local_name(e.name().as_ref()) == b"Relationship" => {
                 let id = attr_value(&e, b"Id").ok()??;
                 let target = attr_value(&e, b"Target").ok()??;
                 map.insert(id, target);
             }
-            Ok(Event::Eof) => break,
+            Ok(Event::End(_)) => depth = depth.checked_sub(1)?,
+            Ok(Event::Eof) if depth == 0 => break,
+            Ok(Event::Eof) => return None,
             Err(_) => return None,
             _ => {}
         }
@@ -1021,16 +1038,25 @@ fn workbook_relationships(data: &[u8]) -> Option<HashMap<String, String>> {
 fn workbook_sheets(data: &[u8]) -> Option<Vec<(String, String)>> {
     let mut r = Reader::from_reader(data);
     let mut out = Vec::new();
+    let mut depth = 0usize;
     loop {
         match r.read_event() {
-            Ok(Event::Start(e)) | Ok(Event::Empty(e))
-                if local_name(e.name().as_ref()) == b"sheet" =>
-            {
+            Ok(Event::Start(e)) => {
+                depth = depth.checked_add(1)?;
+                if local_name(e.name().as_ref()) == b"sheet" {
+                    let name = attr_value(&e, b"name").ok()??;
+                    let id = attr_value(&e, b"id").ok()??;
+                    out.push((name, id));
+                }
+            }
+            Ok(Event::Empty(e)) if local_name(e.name().as_ref()) == b"sheet" => {
                 let name = attr_value(&e, b"name").ok()??;
                 let id = attr_value(&e, b"id").ok()??;
                 out.push((name, id));
             }
-            Ok(Event::Eof) => break,
+            Ok(Event::End(_)) => depth = depth.checked_sub(1)?,
+            Ok(Event::Eof) if depth == 0 => break,
+            Ok(Event::Eof) => return None,
             Err(_) => return None,
             _ => {}
         }
@@ -1145,8 +1171,8 @@ mod tests {
         let bytes = fs::read(source.path()).unwrap();
 
         let victim =
-            std::env::temp_dir().join(format!("deepsearch-{}-0-0.sqlite", std::process::id()));
-        let sentinel = b"DEEPSEARCH_TEMPFILE_SENTINEL";
+            std::env::temp_dir().join(format!("querybit-{}-0-0.sqlite", std::process::id()));
+        let sentinel = b"QUERYBIT_TEMPFILE_SENTINEL";
         let _ = fs::remove_file(&victim);
         fs::write(&victim, sentinel).unwrap();
 

@@ -14,13 +14,13 @@ fn temp_dir() -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    let p = std::env::temp_dir().join(format!("deepsearch-test-{}-{n}", std::process::id()));
+    let p = std::env::temp_dir().join(format!("querybit-test-{}-{n}", std::process::id()));
     fs::create_dir_all(&p).unwrap();
     p
 }
 
 fn run(args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_deepsearch"))
+    Command::new(env!("CARGO_BIN_EXE_querybit"))
         .args(args)
         .output()
         .unwrap()
@@ -39,7 +39,7 @@ fn zip_write(path: &Path, entries: &[(&str, String)]) {
 #[test]
 fn searches_mixed_inputs_and_honors_ignore() {
     let root = temp_dir();
-    let needle = "DEEPSEARCH_SMOKE_9182";
+    let needle = "QUERYBIT_SMOKE_9182";
     fs::write(
         root.join("plain.txt"),
         format!("alpha\n{needle} plain\nomega\n"),
@@ -744,5 +744,147 @@ fn corrupted_tar_gzip_trailer_is_incomplete() {
         stderr.contains("checksum") || stderr.contains("integrity"),
         "{stderr}"
     );
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn truncated_xlsx_metadata_is_incomplete_not_no_match() {
+    let root = temp_dir();
+    let sheet = "<worksheet><sheetData><row><c r=\"A1\" t=\"inlineStr\"><is><t>harmless</t></is></c></row></sheetData></worksheet>";
+
+    let workbook_path = root.join("truncated-workbook.xlsx");
+    zip_write(
+        &workbook_path,
+        &[
+            (
+                "xl/workbook.xml",
+                "<workbook xmlns:r=\"r\"><sheets><sheet name=\"Sheet1\" r:id=\"rId1\">".to_string(),
+            ),
+            (
+                "xl/_rels/workbook.xml.rels",
+                "<Relationships><Relationship Id=\"rId1\" Target=\"worksheets/sheet1.xml\"/></Relationships>".to_string(),
+            ),
+            ("xl/worksheets/sheet1.xml", sheet.to_string()),
+        ],
+    );
+    let output = run(&[
+        "-F",
+        "ABSENT_TRUNCATED_WORKBOOK_NEEDLE",
+        workbook_path.to_str().unwrap(),
+    ]);
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("malformed workbook XML"), "{stderr}");
+
+    let rels_path = root.join("truncated-workbook-rels.xlsx");
+    zip_write(
+        &rels_path,
+        &[
+            (
+                "xl/workbook.xml",
+                "<workbook xmlns:r=\"r\"><sheets><sheet name=\"Sheet1\" r:id=\"rId1\"/></sheets></workbook>".to_string(),
+            ),
+            (
+                "xl/_rels/workbook.xml.rels",
+                "<Relationships><Relationship Id=\"rId1\" Target=\"worksheets/sheet1.xml\">".to_string(),
+            ),
+            ("xl/worksheets/sheet1.xml", sheet.to_string()),
+        ],
+    );
+    let output = run(&[
+        "-F",
+        "ABSENT_TRUNCATED_RELS_NEEDLE",
+        rels_path.to_str().unwrap(),
+    ]);
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("workbook.xml.rels") && stderr.contains("malformed"),
+        "{stderr}"
+    );
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn oversized_compressed_tar_integrity_tail_is_incomplete() {
+    let root = temp_dir();
+    let path = root.join("oversized-tail.tar.gz");
+
+    let mut tar_bytes = Vec::new();
+    {
+        let mut builder = tar::Builder::new(&mut tar_bytes);
+        let body = b"harmless\n";
+        let mut header = tar::Header::new_gnu();
+        header.set_size(body.len() as u64);
+        header.set_mode(0o644);
+        header.set_cksum();
+        builder
+            .append_data(&mut header, "inside.txt", &body[..])
+            .unwrap();
+        builder.finish().unwrap();
+    }
+
+    let file = fs::File::create(&path).unwrap();
+    let mut encoder = GzEncoder::new(file, Compression::default());
+    encoder.write_all(&tar_bytes).unwrap();
+    let zeros = vec![0u8; 1024 * 1024];
+    for _ in 0..65 {
+        encoder.write_all(&zeros).unwrap();
+    }
+    encoder.finish().unwrap();
+
+    let output = run(&[
+        "-F",
+        "ABSENT_OVERSIZED_TAR_TAIL_NEEDLE",
+        path.to_str().unwrap(),
+    ]);
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("integrity tail"), "{stderr}");
+    assert!(stderr.contains("safety budget"), "{stderr}");
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn small_compressed_tar_integrity_tail_preserves_clean_no_match() {
+    let root = temp_dir();
+    let path = root.join("small-tail.tar.gz");
+
+    let mut tar_bytes = Vec::new();
+    {
+        let mut builder = tar::Builder::new(&mut tar_bytes);
+        let body = b"harmless\n";
+        let mut header = tar::Header::new_gnu();
+        header.set_size(body.len() as u64);
+        header.set_mode(0o644);
+        header.set_cksum();
+        builder
+            .append_data(&mut header, "inside.txt", &body[..])
+            .unwrap();
+        builder.finish().unwrap();
+    }
+
+    let file = fs::File::create(&path).unwrap();
+    let mut encoder = GzEncoder::new(file, Compression::default());
+    encoder.write_all(&tar_bytes).unwrap();
+    encoder.write_all(&vec![0u8; 1024 * 1024]).unwrap();
+    encoder.finish().unwrap();
+
+    let output = run(&["-F", "ABSENT_SMALL_TAR_TAIL_NEEDLE", path.to_str().unwrap()]);
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(output.stderr.is_empty());
+
     let _ = fs::remove_dir_all(root);
 }
