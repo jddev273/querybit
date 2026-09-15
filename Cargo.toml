@@ -28,3 +28,4 @@ zstd = "0.13"
 quick-xml = "0.41"
 rusqlite = { version = "0.32", features = ["bundled", "limits"] }
 lopdf = "0.45"
+tempfile = "3"

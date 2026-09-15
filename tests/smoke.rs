@@ -547,3 +547,39 @@ fn committed_xlsx_fixture_is_searchable() {
     assert!(stdout.contains("sheet=Sheet1"), "{stdout}");
     assert!(stdout.contains("cell=A1"), "{stdout}");
 }
+
+#[test]
+fn nested_sqlite_in_zip_is_searchable() {
+    let root = temp_dir();
+    let needle = "NESTED_SQLITE_NEEDLE_577215";
+    let db_path = root.join("source.sqlite");
+    let db = Connection::open(&db_path).unwrap();
+    db.execute("CREATE TABLE notes(body TEXT)", []).unwrap();
+    db.execute("INSERT INTO notes(body) VALUES (?1)", [needle])
+        .unwrap();
+    drop(db);
+    let db_bytes = fs::read(&db_path).unwrap();
+    fs::remove_file(&db_path).unwrap();
+
+    let zip_path = root.join("bundle.zip");
+    let file = fs::File::create(&zip_path).unwrap();
+    let mut zip = ZipWriter::new(file);
+    zip.start_file("inside.sqlite", SimpleFileOptions::default())
+        .unwrap();
+    zip.write_all(&db_bytes).unwrap();
+    zip.finish().unwrap();
+
+    let output = run(&["-F", needle, zip_path.to_str().unwrap()]);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stdout).contains("bundle.zip::inside.sqlite::table=notes"),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    let _ = fs::remove_dir_all(root);
+}

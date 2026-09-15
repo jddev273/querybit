@@ -648,20 +648,16 @@ impl Searcher {
     }
 
     fn search_sqlite_bytes(&mut self, label: &str, bytes: &[u8]) -> Result<()> {
-        let tmp = std::env::temp_dir().join(format!(
-            "deepsearch-{}-{}-{}.sqlite",
-            std::process::id(),
-            self.expanded,
-            self.matches
-        ));
-        fs::write(&tmp, bytes)?;
-        let result = (|| {
-            let conn =
-                Connection::open_with_flags(&tmp, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
-            self.search_sqlite_connection(label, &conn)
-        })();
-        let _ = fs::remove_file(&tmp);
-        result
+        let mut tmp = tempfile::Builder::new()
+            .prefix("deepsearch-")
+            .suffix(".sqlite")
+            .tempfile()?;
+        tmp.write_all(bytes)?;
+        tmp.flush()?;
+        let tmp_path = tmp.into_temp_path();
+        let conn =
+            Connection::open_with_flags(&tmp_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+        self.search_sqlite_connection(label, &conn)
     }
 
     fn search_sqlite_connection(&mut self, label: &str, conn: &Connection) -> Result<()> {
