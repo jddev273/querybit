@@ -12,6 +12,12 @@ querybit -i -C 2 'needle' archive.zip
 
 ## Install
 
+### Cargo
+
+```bash
+cargo install querybit
+```
+
 ### Homebrew (macOS / Linux)
 
 ```bash
