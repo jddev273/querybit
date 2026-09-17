@@ -12,7 +12,23 @@ querybit -i -C 2 'needle' archive.zip
 
 ## Install
 
-Download the binary for your platform from the GitHub release, verify its adjacent SHA-256 checksum, and put it somewhere on your `PATH`.
+### Homebrew (macOS / Linux)
+
+```bash
+brew tap jddev273/tap
+brew install querybit
+```
+
+### Scoop (Windows)
+
+```powershell
+scoop bucket add jddev273 https://github.com/jddev273/scoop-bucket
+scoop install jddev273/querybit
+```
+
+### Direct download
+
+Download the binary for your platform from the [latest GitHub release](https://github.com/jddev273/querybit/releases/latest), verify its adjacent SHA-256 checksum, and put it somewhere on your `PATH`.
 
 - **Linux x86-64:** `querybit-linux-x86_64` is statically linked (musl), so it does not require a particular glibc version. Run `chmod +x querybit-linux-x86_64` after downloading.
 - **macOS Apple Silicon:** `querybit-macos-aarch64` (macOS 11+). Run `chmod +x querybit-macos-aarch64` after downloading.

@@ -125,10 +125,14 @@
           <p>Native binaries for Windows x86-64, Linux x86-64, macOS Apple Silicon and macOS Intel.</p>
         </div>
         <div class="install-side">
-          <div class="cmd"><span>$</span><code>querybit -i -C 2 'needle' ~/Archive</code></div>
-          <div class="cmd"><span>$</span><code>querybit -F 'invoice 2026' old-backups.zip</code></div>
-          <a class="button light" href="https://github.com/jddev273/querybit/releases/latest">Download the latest release <span>↗</span></a>
-          <p class="fine">No installer required. V1 binaries are unsigned, so macOS Gatekeeper or Windows SmartScreen may show the usual first-run warning.</p>
+          <p class="fine"><strong>Homebrew · macOS / Linux</strong></p>
+          <div class="cmd"><span>$</span><code>brew tap jddev273/tap</code></div>
+          <div class="cmd"><span>$</span><code>brew install querybit</code></div>
+          <p class="fine"><strong>Scoop · Windows</strong></p>
+          <div class="cmd"><span>$</span><code>scoop bucket add jddev273 https://github.com/jddev273/scoop-bucket</code></div>
+          <div class="cmd"><span>$</span><code>scoop install jddev273/querybit</code></div>
+          <a class="button light" href="https://github.com/jddev273/querybit/releases/latest">Or download the latest release <span>↗</span></a>
+          <p class="fine">No installer required for direct downloads. V1 binaries are unsigned, so macOS Gatekeeper or Windows SmartScreen may show the usual first-run warning.</p>
         </div>
       </div>
     </div>
